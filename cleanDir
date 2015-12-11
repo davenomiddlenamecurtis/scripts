@@ -1,0 +1,12 @@
+#!/bin/bash
+
+for d in "$@"
+do
+if [ -d $d ]
+then
+	mv $d /cluster/project8/bipolargenomes/tmp/$d
+	rm -r /cluster/project8/bipolargenomes/tmp/$d &
+	mkdir $d 
+fi
+done
+
