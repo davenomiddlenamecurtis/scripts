@@ -1,47 +1,55 @@
 #!/bin/bash
 # DC script to set up GVA analyses, one script per gene
 
-for d in ALLUKSZ.ExAC
+geneList=/home/rejudcu/reference/allGenes101115.txt
+
+disease="WKS"
+model="ct08 ct08.rare"
+# must be in this order or else qdel will delete all the ct08 jobs
+
+if [ -z "$disease" -o -z "$model" ]
+then
+	echo Error in $0: must set environment variables disease and model
+	exit
+fi
+
+if [ "$OLDCLUSTER" = "" ]
+then
+	echo Error in $0: must set OLDCLUSTER to yes or no
+	exit
+fi
+
+someGenesLeft=no
+
+for d in $disease
 do
-for m in all ct08.rare
+for m in $model
 do
 
 testName=$d.$m
-parFile=/home/rejudcu/pars/gva.$testName.par
+argFile=/home/rejudcu/pars/gva.$testName.arg
 
-if [ .$testName == . ]
+if [ $OLDCLUSTER = yes ]
 then
-	echo Need to set testName
-	exit
-fi
-# testName=BPrare
-
-# parFile=/home/rejudcu/pars/gva.BP.1000G.ct08.rare.par
-if [ .$parFile == . ]
-then
-	parFile=/home/rejudcu/pars/gva.$testName.par
-#	echo Need to set parFile
-#	exit
-fi
-
-# geneList=/home/rejudcu/reference/DRDgenes.txt
-geneList=/home/rejudcu/reference/allGenes.txt
-
-softwareFolder=/home/rejudcu/bin
- 
+	softwareFolder=/home/rejudcu/oldBin
+else
+	softwareFolder=/home/rejudcu/bin
+fi 
 # workFolder=/cluster/project8/bipolargenomes/GVA
 
 # workFolder=/home/rejudcu/UK10K2/$testName
 # workFolder=/cluster/project8/bipolargenomes/UK10K2/$testName
 workFolder=/cluster/project8/bipolargenomes/$d/$testName
+mkdir /cluster/project8/bipolargenomes/$d
 mkdir $workFolder
 
-mainScript=$workFolder/scripts/runAllGVA.sh
-batchScript=$workFolder/scripts/runBatchGVA.sh
-fourScript=$workFolder/scripts/runFourGVA.sh
 nSplits=100
+
 splitScript=$workFolder/scripts/split${nSplits}s.sh
-mainSplitScript=$workFolder/scripts/runSplit${nSplits}s.sh
+scriptName=$testName.runSplit${nSplits}.sh
+mainSplitScript=$workFolder/scripts/$scriptName
+
+qdel "'""$testName.runSplit*""'"
 
 nhours=20
 vmem=6 
@@ -50,68 +58,50 @@ queue=queue6
 scratch=0
 
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
-if [ ! -e $workFolder/out ]; then mkdir $workFolder/out; fi;
-if [ ! -e $workFolder/temp ]; then mkdir $workFolder/temp; fi;
+wastebin=$workFolder/wastebin
+if [ ! -e $wastebin ]; then mkdir $wastebin; fi
 if [ ! -e $workFolder/results ]; then mkdir $workFolder/results; fi;
-if [ ! -e $workFolder/error ]; then mkdir $workFolder/error; fi;
-if [ ! -e $workFolder/scripts ]; then mkdir $workFolder/scripts; fi;
-
-echo "
-#!/bin/bash
-#$ -S /bin/bash
-#$ -e $workFolder/error
-#$ -o $workFolder/error
-#$ -cwd
-#$ -l scr=${scratch}G
-#$ -l tmem=${vmem}G,h_vmem=${vmem}G
-#$ -l h_rt=${nhours}:0:0
-#$ -t 1-${njobs}
-#$ -V
-#$ -R y
-" > $batchScript
+if [ -e $workFolder/error ]; then mv $workFolder/error $wastebin/error; ( rm -r $wastebin/error & ) ; fi;
+mkdir $workFolder/error
+if [ -e $workFolder/scripts ]; then mv $workFolder/scripts $wastebin/scripts; (rm -r $wastebin/scripts & ); fi;
+mkdir $workFolder/scripts; 
+if [ -e $workFolder/temp ]; then mv $workFolder/temp $wastebin/temp; (rm -r $wastebin/temp & ); fi;
+mkdir $workFolder/temp; 
 
 cat $geneList | while read geneName
-	do
-	shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
-	if [ -e $shellScript ] ; then rm $shellScript; fi
-	outFile=$workFolder/results/$testName.$geneName.sao
-	if [ ! -e $outFile ]
-	then 
-		echo PATH=$softwareFolder:\$PATH > $shellScript
-		echo mkdir $workFolder/temp/$geneName >> $shellScript
-		echo cd $workFolder/temp/$geneName >> $shellScript
-		echo rm "gva.$geneName.*" >> $shellScript
-		echo geneVarAssoc $parFile $geneName >> $shellScript
-		echo cp "gva.$geneName.*sao" $outFile >> $shellScript
-		echo "if [ ! -s $outFile ] ; then rm -f $outFile; fi" >> $shellScript
-		echo rm -r $workFolder/temp/$geneName >> $shellScript
-		echo sh $shellScript >> $batchScript
-	fi
-	done
+    do
+    shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
+    if [ -e $shellScript ] ; then rm $shellScript; fi
+    outFile=$workFolder/results/$testName.$geneName.sao
+    if [ ! -e $outFile ]
+    then 
+		echo "PATH=$softwareFolder:\$PATH 
+		tempFolder=$workFolder/temp/$geneName
+		# in fact, this will not be used unless $workFolder/temp already exists
+		mkdir \$tempFolder 
+		cd \$tempFolder 
+		rm gva.$geneName.*
+		commLine=\"geneVarAssoc --arg-file $argFile --write-score-file 1 --gene $geneName\" 
+		echo Running:
+		echo \$commLine
+		\$commLine
+		echo finished running geneVarAssoc
+		cp gva.$geneName.*sco $scoreFile 
+		cp gva.$geneName.*sao $outFile 
+		if [ ! -s $outFile ] ; then rm -f $outFile $scoreFile; fi
+		cd ..
+		# avoid upsetting bash by removing the current working directory
+		rm -r \$tempFolder" >> $shellScript
+    fi
+    done
 
-njobs=`ls -l $workFolder/scripts/runGVA*sh | wc -l`
+nScriptsWritten=`ls $workFolder/scripts/runGVA.$testName.*.sh | wc -l`
+if [ $nScriptsWritten -lt $nSplits ]
+then 
+	nSplits=$nScriptsWritten
+fi 
 
-echo "
-#!/bin/bash
-#$ -S /bin/bash
-#$ -e $workFolder/error
-#$ -e $workFolder/error
-#$ -cwd
-#$ -l scr=${scratch}G
-#$ -l tmem=${vmem}G,h_vmem=${vmem}G
-#$ -l h_rt=${nhours}:0:0
-#$ -t 1-${njobs}
-#$ -V
-#$ -R y
-array=( arg0 \`ls $workFolder/scripts/runGVA*sh \`)
-script=\${array[ \$SGE_TASK_ID ]}
-root=\${script##*/};
-root=\${root%.*};
-date
-echo \$script
-sh \$script  
-date
-" > $mainScript
+if [ -e  $mainSplitScript ] ; then rm  $mainSplitScript; fi
 
 echo "
 #!/bin/bash
@@ -119,43 +109,14 @@ echo "
 #$ -e $workFolder/error
 #$ -o $workFolder/error
 #$ -cwd
-#$ -l scr=${scratch}G
-#$ -l tmem=${vmem}G,h_vmem=${vmem}G
-#$ -l h_rt=${nhours}:0:0
-#$ -t 1-${njobs}
-#$ -V
-#$ -R y
-finished=false
-nRunning=0
-ls $workFolder/scripts/runGVA*sh | while [  \$finished == false ]
-	do
-	f=
-	read f
-	if [ .\$f == . ]
-	then
-		finished=true
-	else
-		bash \$f &
-		nRunning=\$(( \$nRunning + 1 ))
-		if [[ (( \$nRunning > 3 )) ]]
-		then
-			echo Am waiting, nRunning is \$nRunning
-			wait
-			nRunning=0
-		fi
-	fi
-	done
-" > $fourScript
-
-echo wrote $fourScript
-
+" >> $mainSplitScript
+if [ $OLDCLUSTER = yes ]
+then
+	echo "#$ -l scr=${scratch}G" >> $mainSplitScript
+else
+	echo "#$ -l tscr=${scratch}G" >> $mainSplitScript
+fi
 echo "
-#!/bin/bash
-#$ -S /bin/bash
-#$ -e $workFolder/error
-#$ -o $workFolder/error
-#$ -cwd
-#$ -l scr=${scratch}G
 #$ -l tmem=${vmem}G,h_vmem=${vmem}G
 #$ -l h_rt=${nhours}:0:0
 #$ -t 1-$nSplits
@@ -165,19 +126,23 @@ date
 echo bash $splitScript \$SGE_TASK_ID
 bash -x $splitScript \$SGE_TASK_ID
 date
-" > $mainSplitScript
+" >> $mainSplitScript
 
 echo "
-echo Running \$0 \$1
+set +e
+#  was exiting after running just one, possibly because no proper exit code from script
+# this should switch off errexit
+echo Running \$0 with argument \$1
 n=1
-ls $workFolder/scripts/runGVA*sh | while read f
+find $workFolder/scripts -name 'runGVA*sh' | while read f
 do
 if [ .\$n == .\$1 ]
 then
-	echo running bash \$f
-	bash \$f
+	echo running source \$f # try using source $f instead of bash $f
+	source \$f
+	echo finished running source \$f
 fi
-if [ \$n == $nSplits ]
+if [ \$n -eq $nSplits ]
 then
 	n=1
 else
@@ -186,9 +151,27 @@ fi
 done
 " > $splitScript
 
-echo wrote  $mainSplitScript
-ls -l $workFolder/scripts/runGVA*sh | wc
+count=`find $workFolder/scripts -name 'runGVA*sh' | wc -l`
+
+if [ $count -gt 0 ]
+then
+	echo wrote $count scripts
+	echo qsub -N $scriptName $mainSplitScript
+	qsub -N $scriptName $mainSplitScript
+	someGenesLeft=yes
+else
+	echo No genes left to do for $testName	
+fi
 
 done
 done
 
+logFile=${0##*/}
+if [ $someGenesLeft = yes ]
+then
+	echo will schedule script to run again
+	echo "disease=$disease; model=$model; export disease; export model; bash $0 &> $workFolder/$logFile.log" | at now + 2 hours
+else
+	echo date > $workFolder/$logFile.log
+	echo All results files written OK >> $workFolder/$logFile.log
+fi

@@ -13,7 +13,8 @@ geneList=/home/rejudcu/reference/allGenes.txt
 # testName=BPrare
 # workFolder=/cluster/project8/bipolargenomes/GVA
 
-# model=ct08.rare
+model="ct08.rare ct08"
+disease=WKS
 
 if [ -z $model -o -z $disease ]
 then

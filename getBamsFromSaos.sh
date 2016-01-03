@@ -9,7 +9,7 @@
 #$ -e /home/rejudcu/tmp
 #$ -o /home/rejudcu/tmp
 
-model=ct08
+model=ct08.rare
 disease=WKS
 bams="/cluster/project8/bipolargenomes/WKS/bams/newbams111115"
 if [ -z $model -o -z $disease -o -z $genes -o -z $bams ]
@@ -44,6 +44,7 @@ do
 	l=0
 	varFile=$varFolder/$testName.$gene.varList
 	if [ -e $varFile ] ; then rm $varFile; fi
+	echo $resultsFolder/$testName.$gene.sao
 	cat $resultsFolder/$testName.$gene.sao | while read line
 	do
 	if [ $l -lt 3 ]

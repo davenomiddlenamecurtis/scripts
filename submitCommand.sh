@@ -18,11 +18,9 @@ source ~/.bashrc
 
 echo setting PATH
 
-PATH=~/bin:${PATH}
 PATH=/share/apps/shapeit.v2.r778.static:${PATH}
 PATH=/cluster/project8/vyp/vincent/Software/tabix-0.2.5:${PATH}
-# just temporary to check new scoreassoc
-PATH=~/newgva:${PATH}
+PATH=$DCBIN:${PATH}
 
 echo Will run this command:
 echo eval $commandLine

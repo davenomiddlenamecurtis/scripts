@@ -9,16 +9,23 @@
 # set +e
 # may be useful to have it during main script
 
-OLDCLUSTER=yes
+# OLDCLUSTER=yes
 # geneList=/home/rejudcu/reference/DRDgenes.txt
 geneList=/home/rejudcu/reference/allGenes101115.txt
 
-# disease="SSS"
-# model="ct08.rare"
+disease="WKS"
+model="ct08 ct08.rare"
+# must be in this order or else qdel will delete all the ct08 jobs
 
-if [ -z $disease -o -z $model ]
+if [ -z "$disease" -o -z "$model" ]
 then
 	echo Error in $0: must set environment variables disease and model
+	exit
+fi
+
+if [ "$OLDCLUSTER" = "" ]
+then
+	echo Error in $0: must set OLDCLUSTER to yes or no
 	exit
 fi
 
@@ -55,12 +62,12 @@ splitScript=$workFolder/scripts/split${nSplits}s.sh
 scriptName=$testName.runSplit${nSplits}.sh
 mainSplitScript=$workFolder/scripts/$scriptName
 
-qdel $scriptName
+qdel "'""$testName.runSplit*""'"
 
 nhours=20
 vmem=2 
 memory=2
-scratch=50
+scratch=120
 
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
 wastebin=$workFolder/wastebin
@@ -111,6 +118,12 @@ cat $geneList | while read geneName
 	fi
 	done
 
+nScriptsWritten=`ls $workFolder/scripts/runGVA.$testName.*.sh | wc -l`
+if [ $nScriptsWritten -lt $nSplits ]
+then 
+	nSplits=$nScriptsWritten
+fi 
+
 if [ -e  $mainSplitScript ] ; then rm  $mainSplitScript; fi
 
 echo "
@@ -124,7 +137,7 @@ if [ $OLDCLUSTER = yes ]
 then
 	echo "#$ -l scr=${scratch}G" >> $mainSplitScript
 else
-	echo "#$ -l scr=${scratch}G" >> $mainSplitScript
+	echo "#$ -l tscr=${scratch}G" >> $mainSplitScript
 fi
 echo "
 #$ -l tmem=${vmem}G,h_vmem=${vmem}G
@@ -162,20 +175,38 @@ echo --clear-case 1 >> \$localArgFile
 date
 cat \$argFileCopy | while read arg file
 do
-if [ \$arg = --case-file -o \$arg = --cont-file -o \$arg = --case-freq-file -o \$arg = --cont-freq-file -o \$arg = --ref-gene-file -o \$arg = --bait-file -o \$arg = --phenotype-file ]
-then
-	cp \$file \$scratchFolder # expands * in vcf file name
-	cp \$file.tbi \$scratchFolder # expands * in tbi file name
-	fileName=\${file##*/}
-	newLine=\"\$arg \$scratchFolder/\$fileName\"
-	echo \"\$newLine\" >> \$localArgFile # avoid echo expanding filespec
-	# echo \$arg "\$scratchFolder/\$fileName" >> \$localArgFile # do not replace variables but do not expand * in vcf file names
-fi
 if [ \$arg = --reference-path ]
 then
 	mkdir \$scratchFolder/reference
 	cp \$file/chr*.fa \$scratchFolder/reference
 	echo --reference-path \$scratchFolder/reference >> \$localArgFile
+fi
+if [ \$arg = --case-file -o \$arg = --cont-file -o \$arg = --case-freq-file -o \$arg = --cont-freq-file -o \$arg = --ref-gene-file -o \$arg = --bait-file -o \$arg = --phenotype-file ]
+then
+	cp \$file.tbi \$scratchFolder # expands * in tbi file name
+	# cp \$file \$scratchFolder # expands * in vcf file name
+	for f in \$file
+	do
+		cp \$f \$scratchFolder
+		sourceSize=\$(stat -c%s \$f)
+		fileName=\${f##*/}
+		destSize=\$(stat -c%s \$scratchFolder/\$fileName)
+		if [ \$sourceSize -ne \$destSize ]
+		then
+			echo Could not copy \$f to \$scratchFolder/\$fileName, probably ran out of scratch space
+			ls -l \$scratchFolder
+			du \$scratchFolder
+			cd \$scratchFolder
+			df
+			cd
+			rm -r \$scratchFolder
+			exit
+		fi
+	done
+	fileName=\${file##*/}
+	newLine=\"\$arg \$scratchFolder/\$fileName\"
+	echo \"\$newLine\" >> \$localArgFile # avoid echo expanding filespec
+	# echo \$arg "\$scratchFolder/\$fileName" >> \$localArgFile # do not replace variables but do not expand * in vcf file names
 fi
 done
 df -h
@@ -224,8 +255,12 @@ fi
 done
 done
 
+logFile=${0##*/}
 if [ $someGenesLeft = yes ]
 then
 	echo will schedule script to run again
-	echo "disease=$disease; model=$model; export disease; export model; bash $0 &> $workFolder/setupGVAscripts.scratch.sh.log" | at now + 6 hours
+	echo "disease=$disease; model=$model; export disease; export model; bash $0 &> $workFolder/$logFile.log" | at now + 3 hours
+else
+	echo date > $workFolder/$logFile.log
+	echo All results files written OK >> $workFolder/$logFile.log
 fi
