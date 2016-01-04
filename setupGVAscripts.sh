@@ -73,6 +73,7 @@ cat $geneList | while read geneName
     shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
     if [ -e $shellScript ] ; then rm $shellScript; fi
     outFile=$workFolder/results/$testName.$geneName.sao
+	scoreFile=$workFolder/results/$testName.$geneName.sco
     if [ ! -e $outFile ]
     then 
 		echo "PATH=$softwareFolder:\$PATH 
