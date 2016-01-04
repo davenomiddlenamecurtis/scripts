@@ -51,7 +51,7 @@ mainSplitScript=$workFolder/scripts/$scriptName
 
 qdel "'""$testName.runSplit*""'"
 
-nhours=20
+nhours=4
 vmem=6 
 memory=2
 queue=queue6
@@ -171,7 +171,7 @@ logFile=${0##*/}
 if [ $someGenesLeft = yes ]
 then
 	echo will schedule script to run again
-	echo "disease=$disease; model=$model; export disease; export model; bash $0 &> $workFolder/$logFile.log" | at now + 2 hours
+	echo "export disease=$disease; export model=$model; bash $0 &> $workFolder/$logFile.log" | at now + 4 hours
 else
 	echo date > $workFolder/$logFile.log
 	echo All results files written OK >> $workFolder/$logFile.log
