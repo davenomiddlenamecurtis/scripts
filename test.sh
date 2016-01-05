@@ -2,4 +2,4 @@
 # DC script to test qdel
 
 testName=fred
-qdel "'""$testName.runSplit*""'"
+qdel '$testName.runSplit*'
