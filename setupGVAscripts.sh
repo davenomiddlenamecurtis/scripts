@@ -13,6 +13,13 @@ then
 	exit
 fi
 
+if [ $HOSTNAME = elwood.local ]
+then
+	export OLDCLUSTER=yes
+else
+	export OLDCLUSTER=no
+fi
+
 if [ "$OLDCLUSTER" = "" ]
 then
 	echo Error in $0: must set OLDCLUSTER to yes or no
