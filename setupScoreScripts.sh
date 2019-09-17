@@ -1,37 +1,22 @@
 #!/bin/bash
 # DC script to set up GVA analyses, one script per gene
 
-geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
-
-if [ -z $geneList ]
-then
-# geneList=/home/rejudcu/SSSDNMclinical/notNeuroGenes.lst
- geneList=/home/rejudcu/SSSDNMclinical/dominantGenes.lst
-# geneList=/home/rejudcu/SSSDNMclinical/recessiveGenes.lst
-fi
+geneList=/home/rejudcu/reference/allGenes101115.txt
 # geneList=/home/rejudcu/reference/DRDgenes.txt
-# geneList=/home/rejudcu/tmp/FAM21EP.lst
 
 # disease="UCLEx.Prionb2"
 # model="ExAC.ct08.rare"
 # model="ct08.cleaned"
 # must be in this order or else qdel will delete all the ct08 jobs
-if [ -z "$disease"]
-then
-  disease=ADSP
-fi
-if [ -z "$model"]
-then
-   model=all
-#   model="codeVars.Dam codeVars.Dis"
-#   model="codeVars.Dam.NotNeuro codeVars.Dis.NotNeuro"
-#  model="codeRecDam codeRecDis"
-fi
+disease="SSS2"
+model="vrare.1"
 
-homeFolder=/cluster/project9/bipolargenomes
+homeFolder=/cluster/project9/bipolargenomes/scores
 argFolder=/home/rejudcu/pars
 softwareFolder=/home/rejudcu/bin
 dataHome=/home/rejudcu
+copyVCF=yes
+# only attempt to copy vcf files if not too big, else arg file must specify absolute path to vcf files
 
 if [ -z "$disease" -o -z "$model" ]
 then
@@ -47,7 +32,7 @@ for m in $model
 do
 
 testName=$d.$m
-argFile=$argFolder/gva.$testName.arg
+argFile=$argFolder/gvs.$testName.arg
 
 
 # workFolder=/cluster/project8/bipolargenomes/GVA
@@ -68,7 +53,7 @@ nhours=4
 vmem=6 
 memory=2
 queue=queue6
-scratch=0
+scratch=10
 
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
 wastebin=$workFolder/wastebin
@@ -83,32 +68,47 @@ mkdir $workFolder/temp;
 
 cat $geneList | while read geneName
     do
+    shellScript=$workFolder/scripts/runGVS.$testName.$geneName.sh
+    if [ -e $shellScript ] ; then rm $shellScript; fi
     outFile=$workFolder/results/$testName.$geneName.sao
+	scoreFile=$workFolder/results/$testName.$geneName.vsco
+	elogFile=$workFolder/results/$testName.$geneName.elog
+# I am going to add an exclusion log file so I can find which variants failed which conditions
     if [ ! -e $outFile ]
     then 
-		shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
-		scoreFile=$workFolder/results/$testName.$geneName.sco
-		elogFile=$workFolder/results/$testName.$geneName.elog
-# I may add an exclusion log file so I can find which variants failed which conditions
 		echo "PATH=$softwareFolder:\$PATH 
-		rm gva.$geneName.*
-		pwd
+		tempFolder=$geneName
+		mkdir \$tempFolder 
+		cd \$tempFolder 
+		rm -f gva*.$geneName.* gvs*.$geneName.*
 		commLine=\"geneVarAssoc --arg-file $argFile --gene $geneName \" 
 		echo Running:
 		echo \$commLine
 		\$commLine 
 		echo finished running geneVarAssoc
-		cp gva*.$geneName.*sco $scoreFile 
-		cp gva*.$geneName.*sao $outFile 
-		cp gva*.$geneName.elog $elogFile
-		if [ ! -s $outFile ] ; then rm -f $outFile $scoreFile $elogFile; fi
-		" >> $shellScript
+		if [ -e gva.$geneName.dat ]
+		then
+			commLine=\"getVarScores --flagfile ../reference/varFlags.txt --gcdatafile gva.$geneName.dat --locusfilterfile gva.$geneName.lf.par --locusweightfile gva.$geneName.lw.par --locusnamefile gva.$geneName.comm.par --filterfile gva.$geneName.filter.par --outfile gvs.$geneName.sao --scorefile gvs.$geneName.vsco --weightfactor 1.000000 \"
+			echo Running:
+			echo \$commLine
+			\$commLine 
+			echo finished running getVarScores
+		else
+			echo geneVarAssoc did not extract valid variants for $geneName
+			echo geneVarAssoc did not extract valid variants for $geneName > $outFile
+		fi
+		# cp gvs.$testName.$geneName.elog $elogFile
+		cp gvs.$geneName.vsco $scoreFile 
+		cp gvs.$geneName.sao $outFile 
+		cd ..
+		# avoid upsetting bash by removing the current working directory
+		rm -r \$tempFolder" >> $shellScript
     fi
     done
 
-# was \$commLine > gva.$testName.$geneName.elog 
+# was \$commLine > gvs.$testName.$geneName.elog 
 		
-nScriptsWritten=`find $workFolder/scripts -name 'runGVA.*.sh' | wc -l`
+nScriptsWritten=`find $workFolder/scripts -name 'runGVS.*.sh' | wc -l`
 if [ $nScriptsWritten -lt $nSplits ]
 then 
 	nSplits=$nScriptsWritten
@@ -132,7 +132,7 @@ echo "
 # If that does not work may try -wd /scratch0
 
 date
-echo bash $splitScript \$SGE_TASK_ID
+echo bash -x $splitScript \$SGE_TASK_ID
 bash -x $splitScript \$SGE_TASK_ID
 date
 " > $mainSplitScript
@@ -143,31 +143,30 @@ set +e
 #  was exiting after running just one, possibly because no proper exit code from script
 # this should switch off errexit
 echo Running \$0 with argument \$1
-$workFolder/temp
-cd $workFolder/temp
-myDir=\$RANDOM
-mkdir \$myDir
-cd \$myDir # this is all so I can have local vcf and reference folders so par files will work with this and with scratch0
-mkdir vcf
-mkdir vcf/$disease
-cd vcf/$disease
-ln -s $dataHome/vcf/$disease/* .
-cd ../..
+mkdir /scratch0/$USER
+tmpDir=/scratch0/$USER/\$RANDOM
+mkdir \$tmpDir
+cd \$tmpDir
+if [ $copyVCF = yes ]
+then
+	mkdir vcf
+	mkdir vcf/$disease
+	cp -L $dataHome/vcf/$disease/* vcf/$disease
+	# copy destination of links
+fi
 mkdir reference
-cd reference
-ln -s $dataHome/reference/* .
-cd ..
-mkdir temp
-cd temp # so relative paths will work OK
+cp -L $dataHome/reference/* reference
+mkdir pars
+cp -L $dataHome/pars/* pars
+# runGVA.sh will create a temporary folder named after the gene and cd to it
 n=1
-find $workFolder/scripts -name 'runGVA*sh' | while read f
+find $workFolder/scripts -name 'runGVS*sh' | while read f
 do
 if [ .\$n == .\$1 ]
 then
 	echo running source \$f # try using source $f instead of bash $f
 	source \$f
 	echo finished running source \$f
-	rm *
 fi
 if [ \$n -eq $nSplits ]
 then
@@ -176,11 +175,10 @@ else
 	n=\$(( \$n + 1 ))
 fi
 done
-cd ../..
-rm -r \$myDir
+rm -r \$tmpDir
 " > $splitScript
 
-count=`find $workFolder/scripts -name 'runGVA*sh' | wc -l`
+count=`find $workFolder/scripts -name 'runGVS*sh' | wc -l`
 
 if [ $count -gt 0 ]
 then
@@ -202,7 +200,7 @@ logFile=${0##*/}
 if [ $someGenesLeft = yes ]
 then
 	echo will schedule script to run again
-	echo "export disease=\"$disease\"; export model=\"$model\"; export geneList=$geneList; bash $0 &> $workFolder/$logFile.log" | at now + $nhours hours
+	echo "export disease=\"$disease\"; export model=\"$model\"; bash $0 &> $workFolder/$logFile.log" | at now + $nhours hours
 else
 	echo date > $workFolder/$logFile.log
 	echo All results files written OK >> $workFolder/$logFile.log

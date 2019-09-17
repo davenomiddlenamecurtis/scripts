@@ -10,8 +10,12 @@
 #$ -o /home/rejudcu/tmp
 
 model=ct08.rare
-disease=WKS
-bams="/cluster/project8/bipolargenomes/WKS/bams/newbams111115"
+# disease=WKS
+# searchString=mcquillin
+searchString=IBDAJ
+disease=IBDAJ
+bams="/cluster/project8/IBDAJE/ExomeSequences/BGI/AJ/align/data/"
+isCram=yes
 if [ -z $model -o -z $disease -o -z $genes -o -z $bams ]
 then
 	echo need to set disease model genes bams
@@ -77,12 +81,17 @@ do
 		end=$(( pos + 100 ))
 		varScript=showVar.$testName.$gene.$chr.$pos.sh
 		if [ -e $varScript ]; then rm $varScript; fi
-		cat $subFile | grep amcquillin | while read ID al a2
+		cat $subFile | grep $searchString | while read ID al a2
 		do
 			echo $ID
-			ID=${ID#*_}
+			ID=${ID##*_}
 			echo $ID
+if [ "$isCram" = "yes" ]
+then
+			$samtools view  -b $bams/$ID*unique*cram $chr:$start-$end > $varFolder/$testName.$gene.$chr.$pos.$ID.bam
+else
 			$samtools view  -b $bams/$ID*unique*bam $chr:$start-$end > $varFolder/$testName.$gene.$chr.$pos.$ID.bam
+fi
 			$samtools index $varFolder/$testName.$gene.$chr.$pos.$ID.bam
 			# echo $samtools view  $bams/$ID*unique*bam $chr:$start-$end
 			# $samtools view  $bams/$ID*unique*bam $chr:$start-$end > $varFolder/$testName.$gene.$chr.$pos.$ID.sam

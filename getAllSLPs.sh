@@ -9,6 +9,8 @@
 #$ -e /home/rejudcu/tmp
 #$ -o /home/rejudcu/tmp
 
+geneList=/home/rejudcu/reference/allGenes.txt
+
 # model="ct08 ct08.rare"
 # model=ExAC.ct08.rare
 # model=1000G.ct08.rare
@@ -16,13 +18,9 @@
 # disease=WKS
 # disease=IBDAJ
 # disease="MIGen" # this MUST be the disease because otherwise copyVCF does not work
-disease=ADSP
-model=all
+disease=SSS2
+model="VEP.WF.lr"
 # disease="UCLEx.Prionb2"
-if [ .$disease == . ]
-then
-  disease=Ashkenazi_ASJ
-fi
 
 if [ -z "$model" -o -z "$disease" ]
 then
@@ -45,7 +43,6 @@ fi
 # testName=BPrare
  
 workFolder=/cluster/project9/bipolargenomes/$d/$testName
-# workFolder=/cluster/project9/bipolargenomes/SCHEMA/results/$d/$testName
 resultsFolder=$workFolder/results
 summFile=$workFolder/$testName.summ.txt
 
@@ -54,7 +51,7 @@ summFile=$workFolder/$testName.summ.txt
 getSLPs='
 BEGIN { ORS=""; nSLP=0; } 
 {
-if ($1 == "SLP" || $1 == "tSLP" || $1 == "tMLP") 
+if ($1 == "SLP" || $1 == "lrSLP" || $1 == "tSLP" ) 
 	{
 	nSLP=nSLP+1;
 	SLPs[nSLP]=$3;
@@ -62,6 +59,9 @@ if ($1 == "SLP" || $1 == "tSLP" || $1 == "tMLP")
 }
 END {
     if (nSLP > 0) {
+	split(FILENAME,words,".");
+	l=length(words);
+	gene=words[l-1];
 	print gene "\t";
 	for (i=1; i<=nSLP; ++i) {
 	print SLPs[i] "\t";
@@ -72,13 +72,11 @@ END {
 '
 
 # echo Gene$'\t'SLPD$'\t'SLPR$'\t'SLPHA$'\t'SLPHO > $summFile
-# echo Gene$'\t'SLP$'\t'tSLPscore$'\t'tSLPscorePC$'\t'tSLPscorePCPRS$'\t'tSLPscorePCCNV$'\t'tSLPscoreALL> $summFile
-echo Gene$'\t'SLP$'\t'tSLPscore$'\t'tSLPPC> $summFile
+echo Gene$'\t'SLP$'\t'lrSLP$'\t'withPCs$'\t'withPPRS> $summFile # this line needs editing to match the analysis
 find  $resultsFolder -name '*.sao' | while read resultsFile
 	do
-	gene=${resultsFile%.sao}
-	gene=${gene#*$model.}
-	awk -v gene=$gene "$getSLPs" $resultsFile >> $summFile
+	awk "$getSLPs" $resultsFile >> $summFile
 	done
+
 done
 done

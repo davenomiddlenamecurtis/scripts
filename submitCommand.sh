@@ -1,16 +1,21 @@
 #$ -S /bin/bash
+## this script is called submitCommand.sh
 # Memory Requests 2Gig
 # need 4 for java / GATK ?
-#$ -l h_vmem=4G
-#$ -l tmem=4G
+# VEP was randomly crashing with 2, and 4 before splitting by chromosomes, still crashed with 4 on chromosome 12, different places
+#$ -l h_vmem=6G
+#$ -l tmem=6G
+# #$ -l h_vmem=2G
+# #$ -l tmem=2G
 #$ -j y
 #Directs SGE to run the job in the same directory from which you submitted it. 
 #$ -cwd
-#$ -l h_rt=24:0:0
+#$ -l h_rt=84:0:0
 
-echo sourcing ~/.bash_profile
-source ~/.bash_profile
+# echo sourcing ~/.bash_profile
+# source ~/.bash_profile
 
+export READALLBASHRC=yes
 echo sourcing ~/.bashrc
 source ~/.bashrc
 
@@ -21,10 +26,11 @@ echo setting PATH
 PATH=/share/apps/shapeit.v2.r778.static:${PATH}
 PATH=/cluster/project8/vyp/vincent/Software/tabix-0.2.5:${PATH}
 PATH=$DCBIN:${PATH}
-
+date 
 echo Will run this command:
 echo eval $commandLine
 eval $commandLine
+date
 
 # was
 # echo eval sh $commandLine

@@ -13,9 +13,9 @@ geneList=/home/rejudcu/reference/allGenes.txt
 # testName=BPrare
 # workFolder=/cluster/project8/bipolargenomes/GVA
 
-for d in SSSDNM
+for d in SSSDNMnew
 do
-for n in all ct08.rare
+for n in ct08.rare
 do 
 
 testName=$d.$n
@@ -30,11 +30,11 @@ fi
 # workFolder=/cluster/project8/bipolargenomes/GVA
 # workFolder=$HOME/UK10K2/$testName
 # workFolder=/cluster/project8/bipolargenomes/UK10K2/$testName
-workFolder=/cluster/project8/bipolargenomes/SSSDNM/$testName
+workFolder=/cluster/project9/bipolargenomes/$d/$testName
 resultsFolder=$workFolder/results
 summFile=$workFolder/$testName.summ.txt
 
-echo Gene$'\t'SLPD$'\t'SLPR$'\t'SLPHA$'\t'SLPHO$'\t'DNM1$'\t'DNM2$'\t'DNM3$'\t'NM1$'\t'NM2$'\t'NM3> $summFile
+echo Gene$'\t'SLPD$'\t'SLPR$'\t'DNM1$'\t'DNM2$'\t'DNM3$'\t'NM1$'\t'NM2$'\t'NM3> $summFile
 ls  $resultsFolder/*.*.*.sao | while read resultsFile
 	do
 	geneName=$resultsFile
@@ -66,7 +66,7 @@ ls  $resultsFolder/*.*.*.sao | while read resultsFile
 		fi
 		if [ "$w1" == "NB" ]
 		then
-		echo $geneName$'\t'${column[0]}$'\t'${column[1]}$'\t'${column[2]}$'\t'${column[3]}$'\t'${dnm[0]}$'\t'${dnm[1]}$'\t'${dnm[2]}$'\t'${nm[0]}$'\t'${nm[1]}$'\t'${nm[2]} >> $summFile
+		echo $geneName$'\t'${column[0]}$'\t'${column[1]}$'\t'${dnm[1]}$'\t'${dnm[2]}$'\t'${dnm[3]}$'\t'${nm[0]}$'\t'${nm[1]}$'\t'${nm[2]} >> $summFile
 # this must be within the read loop because otherwise the variables outside are not set
 		break
 		fi

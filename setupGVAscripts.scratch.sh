@@ -1,31 +1,51 @@
 #!/bin/bash
+# DC script to set up GVA analyses, one script per gene
 
-# DC script to set up GVA analyses, one script per gene, move all reference files to scratch0 first, run 100 scripts
+geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
+# geneList=/home/rejudcu/reference/BP.GWAS.hits.txt
+# disease=MPexomes
+# model=bpOnly.VEP
 
-# On new cluster exits as soon as one analysis done. I suspect this is because errexit is set (set -e, set -o errexit), so I am inserting set +e to switch it off
-
-# set -x
-
-# set +e
-# may be useful to have it during main script
-
-# OLDCLUSTER=yes
+if [ -z $geneList ]
+then
+# geneList=/home/rejudcu/SSSDNMclinical/notNeuroGenes.lst
+# geneList=/home/rejudcu/SSSDNMclinical/dominantGenes.lst
+ geneList=/home/rejudcu/SSSDNMclinical/recessiveGenes.lst
+fi
+# geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
 # geneList=/home/rejudcu/reference/DRDgenes.txt
-geneList=/home/rejudcu/reference/allGenes101115.txt
+# geneList=/home/rejudcu/tmp/FAM21EP.lst
 
-disease="WKS"
-model="ct08 ct08.rare"
+# disease="UCLEx.Prionb2"
+# model="ExAC.ct08.rare"
+# model="ct08.cleaned"
 # must be in this order or else qdel will delete all the ct08 jobs
+
+if [ -z "$disease" ]
+then
+  disease=ADSP
+fi
+if [ -z "$model" ]
+then
+  model=all
+#   model="codeVars.Dam.NotNeuro codeVars.Dis.NotNeuro"
+#  model="codeVars.Dam codeVars.Dis"
+#  model="codeRecDam codeRecDis"
+fi
+# doing this so I can copy the annotation files
+
+homeFolder=/cluster/project9/bipolargenomes
+argFolder=/home/rejudcu/pars
+# softwareFolder=/home/rejudcu/bin
+softwareFolder=/home/rejudcu/tmp #use this to determine which versions of scoreassoc and geneVarAssoc get used
+dataHome=/home/rejudcu
+copyVCF=yes
+# copyVCF=no
+# only attempt to copy vcf files if not too big, else arg file must specify absolute path to vcf files
 
 if [ -z "$disease" -o -z "$model" ]
 then
 	echo Error in $0: must set environment variables disease and model
-	exit
-fi
-
-if [ "$OLDCLUSTER" = "" ]
-then
-	echo Error in $0: must set OLDCLUSTER to yes or no
 	exit
 fi
 
@@ -37,26 +57,17 @@ for m in $model
 do
 
 testName=$d.$m
-argFile=/home/rejudcu/pars/gva.$testName.arg
+argFile=$argFolder/gva.$testName.arg
 
 
-if [ $OLDCLUSTER = yes ]
-then
-	softwareFolder=/home/rejudcu/oldBin
-else
-	softwareFolder=/home/rejudcu/bin
-fi 
 # workFolder=/cluster/project8/bipolargenomes/GVA
 
-# workFolder=/home/rejudcu/UK10K2/$testName
-# workFolder=/cluster/project8/bipolargenomes/UK10K2/$testName
-workFolder=/cluster/project8/bipolargenomes/$d/$testName
-mkdir /cluster/project8/bipolargenomes/$d
+workFolder=$homeFolder/$d/$testName
+mkdir $homeFolder/$d
 mkdir $workFolder
-# scratchHome=/cluster/scratch4/rejudcu_scratch/GVA
-scratchHome=/scratch0/GVA.$testName
 
-nSplits=100
+nSplits=100 # change this to 10 for the clinical SSSDNM thing
+# nSplits=1 # for 30 BP genes
 
 splitScript=$workFolder/scripts/split${nSplits}s.sh
 scriptName=$testName.runSplit${nSplits}.sh
@@ -64,10 +75,13 @@ mainSplitScript=$workFolder/scripts/$scriptName
 
 qdel $testName.'runSplit*'
 
-nhours=6
-vmem=2 
+nhours=12 # were remaining on queue for 4 hours
+vmem=6 
 memory=2
-scratch=120
+queue=queue6
+# scratch=10
+# apparently I was using 40
+scratch=40
 
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
 wastebin=$workFolder/wastebin
@@ -77,48 +91,44 @@ if [ -e $workFolder/error ]; then mv $workFolder/error $wastebin/error; ( rm -r 
 mkdir $workFolder/error
 if [ -e $workFolder/scripts ]; then mv $workFolder/scripts $wastebin/scripts; (rm -r $wastebin/scripts & ); fi;
 mkdir $workFolder/scripts; 
+if [ -e $workFolder/temp ]; then mv $workFolder/temp $wastebin/temp; (rm -r $wastebin/temp & ); fi;
+mkdir $workFolder/temp; 
 
 cat $geneList | while read geneName
-	do
-	shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
-	if [ -e $shellScript ] ; then rm $shellScript; fi
-	outFile=$workFolder/results/$testName.$geneName.sao
+    do
+    shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
+    if [ -e $shellScript ] ; then rm $shellScript; fi
+    outFile=$workFolder/results/$testName.$geneName.sao
 	scoreFile=$workFolder/results/$testName.$geneName.sco
-	if [ ! -e $outFile ]
-	then 
+	elogFile=$workFolder/results/$testName.$geneName.elog
+# I am going to add an exclusion log file so I can find which variants failed which conditions
+    if [ ! -e $outFile ]
+    then 
 		echo "PATH=$softwareFolder:\$PATH 
-		if [ .\$scratchFolder = . ] 
-		then 
-			tempFolder=$workFolder/temp/$geneName
-			# in fact, this will not be used unless $workFolder/temp already exists
-		else
-			tempFolder=\$scratchFolder/temp/$geneName
-			mkdir \$scratchFolder/temp
-		fi
+		set +e
+		# this should switch off errexit to prevent script exiting by default if no proper exit code from child process
+		tempFolder=$geneName
 		mkdir \$tempFolder 
 		cd \$tempFolder 
-		rm gva.$geneName.*
-		if [ .\$localArgFile = . ]
-		then
-			commLine=\"geneVarAssoc --arg-file $argFile --write-score-file 1 --gene $geneName\" 
-		else
-			commLine=\"geneVarAssoc --arg-file \$argFileCopy --arg-file \$localArgFile --write-score-file 1 --gene $geneName\" 
-		fi
+		rm gva*.$geneName.*
+		commLine=\"geneVarAssoc --arg-file $argFile --gene $geneName \" 
 		echo Running:
 		echo \$commLine
-		\$commLine
+		\$commLine 
 		echo finished running geneVarAssoc
-		cp gva.$geneName.*sco $scoreFile 
-		cp gva.$geneName.*sao $outFile 
-		if [ ! -s $outFile ] ; then rm -f $outFile $scoreFile; fi
+		cp gva*.$geneName.*sco $scoreFile 
+		cp gva*.$geneName.*sao $outFile 
+		# cp gva*.$testName.$geneName.elog $elogFile
+		if [ ! -s $outFile ] ; then rm -f $outFile $scoreFile $elogFile; fi
 		cd ..
 		# avoid upsetting bash by removing the current working directory
 		rm -r \$tempFolder" >> $shellScript
+    fi
+    done
 
-	fi
-	done
-
-nScriptsWritten=`ls $workFolder/scripts/runGVA.$testName.*.sh | wc -l`
+# was \$commLine > gva.$testName.$geneName.elog 
+		
+nScriptsWritten=`find $workFolder/scripts -name 'runGVA.*.sh' | wc -l`
 if [ $nScriptsWritten -lt $nSplits ]
 then 
 	nSplits=$nScriptsWritten
@@ -131,98 +141,48 @@ echo "
 #$ -S /bin/bash
 #$ -e $workFolder/error
 #$ -o $workFolder/error
-#$ -cwd
-" >> $mainSplitScript
-if [ $OLDCLUSTER = yes ]
-then
-	echo "#$ -l scr=${scratch}G" >> $mainSplitScript
-else
-	echo "#$ -l tscr=${scratch}G" >> $mainSplitScript
-fi
-echo "
+#$ -l tscr=${scratch}G
 #$ -l tmem=${vmem}G,h_vmem=${vmem}G
 #$ -l h_rt=${nhours}:0:0
 #$ -t 1-$nSplits
 #$ -V
 #$ -R y
+
+# I used to have #$ -cwd but I am going to try just omitting it as sometimes cannot cd to it
+# If that does not work may try -wd /scratch0
+
 date
-mkdir $scratchHome
-echo bash $splitScript \$SGE_TASK_ID
+echo bash -x $splitScript \$SGE_TASK_ID
 bash -x $splitScript \$SGE_TASK_ID
 date
-" >> $mainSplitScript
-
-cat $mainSplitScript
-ls -l $mainSplitScript
+" > $mainSplitScript
 
 echo "
-echo Running \$0 with argument \$1
-echo Script now looks like this:
-cat \$0
-
-scratchFolder=$scratchHome/temp\$1
-export scratchFolder
-mkdir \$scratchFolder
-rm -r \$scratchFolder/*
-df -h
-localArgFile=\$scratchFolder/localArgFile.arg
-export localArgFile
-cp $argFile \$scratchFolder
-argFileCopy=\$scratchFolder/${argFile##*/}
-export argFileCopy
-echo --clear-cont 1 > \$localArgFile
-echo --clear-case 1 >> \$localArgFile
-date
-cat \$argFileCopy | while read arg file
-do
-if [ \$arg = --reference-path ]
-then
-	mkdir \$scratchFolder/reference
-	cp \$file/chr*.fa \$scratchFolder/reference
-	echo --reference-path \$scratchFolder/reference >> \$localArgFile
-fi
-if [ \$arg = --case-file -o \$arg = --cont-file -o \$arg = --case-freq-file -o \$arg = --cont-freq-file -o \$arg = --ref-gene-file -o \$arg = --bait-file -o \$arg = --phenotype-file ]
-then
-	cp \$file.tbi \$scratchFolder # expands * in tbi file name
-	# cp \$file \$scratchFolder # expands * in vcf file name
-	for f in \$file
-	do
-		cp \$f \$scratchFolder
-		sourceSize=\$(stat -c%s \$f)
-		fileName=\${f##*/}
-		destSize=\$(stat -c%s \$scratchFolder/\$fileName)
-		if [ \$sourceSize -ne \$destSize ]
-		then
-			echo Could not copy \$f to \$scratchFolder/\$fileName, probably ran out of scratch space
-			ls -l \$scratchFolder
-			du \$scratchFolder
-			cd \$scratchFolder
-			df
-			cd
-			rm -r \$scratchFolder
-			exit
-		fi
-	done
-	fileName=\${file##*/}
-	newLine=\"\$arg \$scratchFolder/\$fileName\"
-	echo \"\$newLine\" >> \$localArgFile # avoid echo expanding filespec
-	# echo \$arg "\$scratchFolder/\$fileName" >> \$localArgFile # do not replace variables but do not expand * in vcf file names
-fi
-done
-df -h
-date
-echo wrote \$localArgFile, which looks like this:
-cat \$localArgFile
-echo ls -l \$scratchfolder
-
+#!/bin/bash
 set +e
 #  was exiting after running just one, possibly because no proper exit code from script
 # this should switch off errexit
-
+echo Running \$0 with argument \$1
+mkdir /scratch0/$USER
+tmpDir=/scratch0/$USER/\$RANDOM
+mkdir \$tmpDir
+cd \$tmpDir
+if [ $copyVCF = yes ]
+then
+	mkdir vcf
+	mkdir vcf/$disease
+	cp -L $dataHome/vcf/$disease/* vcf/$disease
+	# copy destination of links
+fi
+mkdir reference
+cp -L $dataHome/reference/* reference
+mkdir pars
+cp -L $dataHome/pars/* pars
+# runGVA.sh will create a temporary folder named after the gene and cd to it
 n=1
 find $workFolder/scripts -name 'runGVA*sh' | while read f
 do
-if [ .\$n = .\$1 ]
+if [ .\$n == .\$1 ]
 then
 	echo running source \$f # try using source $f instead of bash $f
 	source \$f
@@ -235,10 +195,8 @@ else
 	n=\$(( \$n + 1 ))
 fi
 done
-rm -r \$scratchFolder
+rm -r \$tmpDir
 " > $splitScript
-
-echo wrote  $mainSplitScript
 
 count=`find $workFolder/scripts -name 'runGVA*sh' | wc -l`
 
@@ -246,7 +204,10 @@ if [ $count -gt 0 ]
 then
 	echo wrote $count scripts
 	echo qsub -N $scriptName $mainSplitScript
+	pushd $workFolder
+# reason for this is that I would get Eqw with qstat -j error message: error: can't chdir to /home/rejudcu/tmp: No such file or directory 
 	qsub -N $scriptName $mainSplitScript
+	popd
 	someGenesLeft=yes
 else
 	echo No genes left to do for $testName	
@@ -259,7 +220,7 @@ logFile=${0##*/}
 if [ $someGenesLeft = yes ]
 then
 	echo will schedule script to run again
-	echo "export disease=$disease; export model=$model; bash $0 &> $workFolder/$logFile.log" | at now + $nhours hours
+	echo "export disease=\"$disease\"; export model=\"$model\"; export geneList=$geneList; bash $0 &> $workFolder/$logFile.log" | at now + $nhours hours
 else
 	echo date > $workFolder/$logFile.log
 	echo All results files written OK >> $workFolder/$logFile.log
