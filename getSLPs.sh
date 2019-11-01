@@ -16,8 +16,8 @@
 # disease=WKS
 # disease=IBDAJ
 # disease="MIGen" # this MUST be the disease because otherwise copyVCF does not work
-disease=ADSP
-model=all
+disease=MPexomes
+model=bp1.myWeights
 # disease="UCLEx.Prionb2"
 if [ .$disease == . ]
 then
@@ -73,7 +73,7 @@ END {
 
 # echo Gene$'\t'SLPD$'\t'SLPR$'\t'SLPHA$'\t'SLPHO > $summFile
 # echo Gene$'\t'SLP$'\t'tSLPscore$'\t'tSLPscorePC$'\t'tSLPscorePCPRS$'\t'tSLPscorePCCNV$'\t'tSLPscoreALL> $summFile
-echo Gene$'\t'SLP$'\t'tSLPscore$'\t'tSLPPC> $summFile
+echo Gene$'\t'SLP> $summFile
 find  $resultsFolder -name '*.sao' | while read resultsFile
 	do
 	gene=${resultsFile%.sao}

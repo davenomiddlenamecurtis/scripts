@@ -21,10 +21,11 @@ outputFolder="/home/sbandyop/SCHEMA/results"
 
 resultsFolder="/cluster/project9/bipolargenomes/ADSP/ADSP.all/results"
 # resultsFolder="/home/rejudcu/tmp"
-outputFolder="/home/rejudcu/tmp"
-geneOutputFile="ADSP.C1R.txt"
-genes=c("C1R") 
-cohort_names = c("gva")
+outputFolder="/home/rejudcu/ADSP/genes"
+geneOutputFile="ADSP.genes.vars.txt"
+geneFile="/home/rejudcu/ADSP/genes/ADSP.genes.txt"
+genes=readLines(geneFile)
+cohort_names = c("ADSP.all")
 prefixSpec="%s"
 
 entriesPerTranscript=25

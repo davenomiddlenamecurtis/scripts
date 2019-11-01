@@ -3,8 +3,8 @@
 
 geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
 # geneList=/home/rejudcu/reference/BP.GWAS.hits.txt
-# disease=MPexomes
-# model=bpOnly.VEP
+disease=MPexomes
+model=bp1.myWeights
 
 if [ -z $geneList ]
 then
