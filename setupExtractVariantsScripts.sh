@@ -1,29 +1,26 @@
 #!/bin/bash
-# DC script to set up GVA analyses, one script per gene
+# DC script extract variants in genes from WGS dataset, prior to annotation
 
-# geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
-# geneList=/home/rejudcu/reference/BP.GWAS.hits.txt
-geneList=/home/rejudcu/reference38/allGenes.20191018.onePCDHG.txt
-# geneList=/home/rejudcu/reference/DRDgenes.txt
-# disease=MPexomes
-# model=bp1.myWeights
-disease=ADSP2
-model=common.withAPOE
 refdir=reference38
+geneList=/home/rejudcu/reference38/refseqgenes.hg38.20191018.allGenes.onePCDHG.txt
+# geneList=/home/rejudcu/reference/DRDgenes.txt
+disease=ADSP2
+model=common
+
 if [ -z $geneList ]
 then
-# geneList=/home/rejudcu/SSSDNMclinical/notNeuroGenes.lst
+ geneList=/home/rejudcu/SSSDNMclinical/notNeuroGenes.lst
 # geneList=/home/rejudcu/SSSDNMclinical/dominantGenes.lst
- geneList=/home/rejudcu/SSSDNMclinical/recessiveGenes.lst
+# geneList=/home/rejudcu/SSSDNMclinical/recessiveGenes.lst
 fi
 # geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
+# geneList=/home/rejudcu/reference/DRDgenes.txt
 # geneList=/home/rejudcu/tmp/FAM21EP.lst
 
 # disease="UCLEx.Prionb2"
 # model="ExAC.ct08.rare"
 # model="ct08.cleaned"
 # must be in this order or else qdel will delete all the ct08 jobs
-
 
 if [ -z "$refdir" ]
 then
@@ -44,11 +41,9 @@ fi
 
 homeFolder=/cluster/project9/bipolargenomes
 argFolder=/home/rejudcu/pars
-# softwareFolder=/home/rejudcu/bin
-softwareFolder=/home/rejudcu/tmp #use this to determine which versions of scoreassoc and geneVarAssoc get used
 dataHome=/home/rejudcu
-copyVCF=yes
-# copyVCF=no
+# copyVCF=yes
+copyVCF=no
 # only attempt to copy vcf files if not too big, else arg file must specify absolute path to vcf files
 
 if [ -z "$disease" -o -z "$model" ]
@@ -94,7 +89,7 @@ scratch=40
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
 wastebin=$workFolder/wastebin
 if [ ! -e $wastebin ]; then mkdir $wastebin; fi
-if [ ! -e $workFolder/results ]; then mkdir $workFolder/results; fi;
+if [ ! -e $workFolder/vars ]; then mkdir $workFolder/vars; fi;
 if [ -e $workFolder/error ]; then mv $workFolder/error $wastebin/error; ( rm -r $wastebin/error & ) ; fi;
 mkdir $workFolder/error
 if [ -e $workFolder/scripts ]; then mv $workFolder/scripts $wastebin/scripts; (rm -r $wastebin/scripts & ); fi;
@@ -106,9 +101,7 @@ cat $geneList | while read geneName
     do
     shellScript=$workFolder/scripts/runGVA.$testName.$geneName.sh
     if [ -e $shellScript ] ; then rm $shellScript; fi
-    outFile=$workFolder/results/$testName.$geneName.sao
-	scoreFile=$workFolder/results/$testName.$geneName.sco
-	elogFile=$workFolder/results/$testName.$geneName.elog
+    outFile=$workFolder/vars/$testName.$geneName.vars.vcf
 # I am going to add an exclusion log file so I can find which variants failed which conditions
     if [ ! -e $outFile ]
     then 
@@ -119,15 +112,13 @@ cat $geneList | while read geneName
 		mkdir \$tempFolder 
 		cd \$tempFolder 
 		rm gva*.$geneName.*
-		commLine=\"geneVarAssoc --arg-file $argFile --gene $geneName \" 
+		commLine=\"geneVarAssoc --arg-file $argFile --gene $geneName --only-extract-variants 1 --keep-temp-files 1\" 
 		echo Running:
 		echo \$commLine
 		\$commLine 
 		echo finished running geneVarAssoc
-		cp gva*.$geneName.*sco $scoreFile 
-		cp gva*.$geneName.*sao $outFile 
-		# cp gva*.$testName.$geneName.elog $elogFile
-		if [ ! -s $outFile ] ; then rm -f $outFile $scoreFile $elogFile; fi
+		cat gva.$geneName.case.1.vcf | grep -v '#' |  cut -f1-9 | sed -e s/chr// > $outFile 
+#remove the chr to make it easier to sort
 		cd ..
 		# avoid upsetting bash by removing the current working directory
 		rm -r \$tempFolder" >> $shellScript
@@ -175,6 +166,7 @@ mkdir /scratch0/$USER
 tmpDir=/scratch0/$USER/\$RANDOM
 mkdir \$tmpDir
 cd \$tmpDir
+mkdir pars
 if [ $copyVCF = yes ]
 then
 	mkdir vcf
@@ -184,7 +176,6 @@ then
 fi
 mkdir $refdir
 cp -L $dataHome/$refdir/* $refdir
-mkdir pars
 cp -L $dataHome/pars/* pars
 # runGVA.sh will create a temporary folder named after the gene and cd to it
 n=1
@@ -231,5 +222,5 @@ then
 	echo "export disease=\"$disease\"; export model=\"$model\"; export geneList=$geneList; bash $0 &> $workFolder/$logFile.log" | at now + $nhours hours
 else
 	echo date > $workFolder/$logFile.log
-	echo All results files written OK >> $workFolder/$logFile.log
+	echo All variant files written OK >> $workFolder/$logFile.log
 fi
