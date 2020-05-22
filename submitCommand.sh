@@ -4,6 +4,8 @@
 # need 4 for java / GATK ?
 # VEP was randomly crashing with 2, and 4 before splitting by chromosomes, still crashed with 4 on chromosome 12, different places
 # now still randomly crashing with 6 so increasing to 8 - no good, try 12 - looks like that fixed it
+# #$ -l h_vmem=64G
+# #$ -l tmem=64G
 #$ -l h_vmem=12G
 #$ -l tmem=12G
 # #$ -l h_vmem=2G

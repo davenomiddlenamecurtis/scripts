@@ -1,7 +1,6 @@
 #!/bin/bash
 #$ -S /bin/bash
 #$ -cwd
-#$ -l scr=0G
 #$ -l tmem=1G,h_vmem=1G
 #$ -l h_rt=20:0:0
 #$ -V
@@ -18,6 +17,10 @@
 # disease="MIGen" # this MUST be the disease because otherwise copyVCF does not work
 disease=ADSP2
 model=common.withAPOE
+
+disease=UKBB
+model=BMI.all
+
 # disease="UCLEx.Prionb2"
 if [ .$disease == . ]
 then
@@ -54,7 +57,7 @@ summFile=$workFolder/$testName.summ.txt
 getSLPs='
 BEGIN { ORS=""; nSLP=0; } 
 {
-if ($1 == "SLP" || $1 == "tSLP" || $1 == "tMLP") 
+if ($1 == "SLP" || $1 == "tSLP" || $1 == "tMLP" || $1 == "linrSLP") 
 	{
 	nSLP=nSLP+1;
 	SLPs[nSLP]=$3;
@@ -73,7 +76,7 @@ END {
 
 # echo Gene$'\t'SLPD$'\t'SLPR$'\t'SLPHA$'\t'SLPHO > $summFile
 # echo Gene$'\t'SLP$'\t'tSLPscore$'\t'tSLPscorePC$'\t'tSLPscorePCPRS$'\t'tSLPscorePCCNV$'\t'tSLPscoreALL> $summFile
-echo Gene$'\t'tSLP> $summFile
+echo Gene$'\t'linrSLP$'\t'tSLP> $summFile
 # echo Gene$'\t'SLP$'\t'tSLP$'\t'tSLPPC> $summFile
 
 find  $resultsFolder -name '*.sao' | while read resultsFile

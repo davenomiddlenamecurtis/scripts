@@ -1,7 +1,19 @@
 #!/bin/bash
 # DC script to set up GVA analyses, one script per gene
 
-geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
+# geneList=/home/rejudcu/reference/allGenes140817.onePCDHG.txt
+geneList=/home/rejudcu/reference38/allGenes.20191018.onePCDHG.txt
+# geneList=/home/rejudcu/reference/DRDgenes.txt
+# disease=MPexomes
+# model=bp1.myWeights
+
+# disease=ADSP2
+# model=common.withAPOE
+
+disease=UKBB
+model=BMI.all
+
+refdir=reference38
 
 if [ -z $geneList ]
 then
@@ -16,11 +28,11 @@ fi
 # model="ExAC.ct08.rare"
 # model="ct08.cleaned"
 # must be in this order or else qdel will delete all the ct08 jobs
-if [ -z "$disease"]
+if [ -z "$disease" ]
 then
   disease=ADSP
 fi
-if [ -z "$model"]
+if [ -z "$model" ]
 then
    model=all
 #   model="codeVars.Dam codeVars.Dis"
@@ -69,6 +81,9 @@ vmem=6
 memory=2
 queue=queue6
 scratch=0
+
+# UKBB analyses were running out of memory with vmem=6
+vmem=8
 
 if [ ! -e $workFolder ]; then mkdir $workFolder; fi;
 wastebin=$workFolder/wastebin
@@ -153,9 +168,9 @@ mkdir vcf/$disease
 cd vcf/$disease
 ln -s $dataHome/vcf/$disease/* .
 cd ../..
-mkdir reference
-cd reference
-ln -s $dataHome/reference/* .
+mkdir $refdir
+cd $refdir
+ln -s $dataHome/$refdir/* .
 cd ..
 mkdir temp
 cd temp # so relative paths will work OK

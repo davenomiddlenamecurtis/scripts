@@ -7,8 +7,13 @@ geneList=/home/rejudcu/reference38/allGenes.20191018.onePCDHG.txt
 # geneList=/home/rejudcu/reference/DRDgenes.txt
 # disease=MPexomes
 # model=bp1.myWeights
-disease=ADSP2
-model=common.withAPOE
+
+# disease=ADSP2
+# model=common.withAPOE
+
+disease=UKBB
+model=BMI.all
+
 refdir=reference38
 if [ -z $geneList ]
 then

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+use23=yes
 
 root=$1
 if [ -z "$mult" ]
@@ -7,11 +8,16 @@ then
   mult=yes
 # annotations for multiple transcripts
 fi
-if [ "$X" == "no" ]
+if [ "$useX" == "yes" ]
 then
- allChrs="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22"
-else
  allChrs="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X"
+else
+if [ "$use23" == "yes" ]
+then
+ allChrs="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23"
+else
+ allChrs="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22"
+fi
 fi
 
 # VEP=/share/ref/VEP/ensembl-tools-release-87/scripts/variant_effect_predictor/variant_effect_predictor.pl
@@ -72,6 +78,7 @@ then
 #	--format vcf --output_file $chrfile --vcf --force_overwrite \
 #	--sift b --polyphen b $PICK
 tabix $root.vars.vcf.gz $c:0-400000000 | perl /share/apps/ensembl-vep-97/vep \
+    --synonyms ~/vep/chr_synonyms.txt \
 	--cache --dir /cluster/project9/bipolargenomes/vepcache --merged --port 3337 --force_overwrite \
 	--sift b --polyphen b --offline --assembly GRCh38 --format vcf \
 	--fasta /cluster/project9/bipolargenomes/vepcache/homo_sapiens_merged/97_GRCh38 \
@@ -105,5 +112,3 @@ $VCFCONCAT $vcfs > $root$MULT.annot.vcf
 rm $root$MULT.annot.vcf.gz # just in case
 bgzip $root$MULT.annot.vcf
 tabix -f -p vcf $root$MULT.annot.vcf.gz
-
-	have
